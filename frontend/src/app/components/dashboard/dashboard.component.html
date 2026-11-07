@@ -1,0 +1,303 @@
+<div class="football-dashboard">
+  <!-- Top Research Welcome Banner -->
+  <div class="welcome-banner">
+    <div class="banner-content">
+      <div class="banner-badge">
+        <span class="badge-dot"></span>
+        <span>FOOTBALL RESEARCH PLATFORM — MASTER REPOSITORY</span>
+      </div>
+      <h1 class="banner-title">Historical Football Analytics &amp; Research</h1>
+      <p class="banner-desc">
+        Deterministic canonical identity engine, multi-season historical match ingestion, and relational football data exploration.
+      </p>
+    </div>
+    <div class="banner-actions">
+      <button (click)="loadOverview()" class="btn btn-refresh" [disabled]="loading">
+        <svg class="w-4 h-4 mr-2" [class.animate-spin]="loading" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+        <span>Refresh Research Data</span>
+      </button>
+      <a routerLink="/data-centre" class="btn btn-primary">
+        <span>Ingest Historical CSV</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Backend Offline Alert Banner -->
+  <div *ngIf="errorMessage" class="card alert-card">
+    <div class="alert-icon">
+      <svg class="w-6 h-6 text-rose" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>
+    </div>
+    <div class="alert-body">
+      <div class="alert-title font-semibold text-rose">Backend Service Offline or Unreachable</div>
+      <div class="alert-msg text-sm text-secondary">
+        {{ errorMessage }}
+      </div>
+    </div>
+    <button (click)="loadOverview()" class="btn btn-secondary btn-sm">Retry Connection</button>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading && !overview" class="loading-container">
+    <div class="spinner"></div>
+    <p class="text-muted">Loading live football database statistics...</p>
+  </div>
+
+  <!-- Main Content When Data Available -->
+  <ng-container *ngIf="overview">
+    <!-- Section 1: Football Data Overview Metrics -->
+    <div class="metrics-grid">
+      <!-- Historical Matches -->
+      <div class="card metric-card matches-metric">
+        <div class="metric-top">
+          <span class="metric-label">Historical Matches</span>
+          <span class="metric-pill pill-rose">3NF Indexed</span>
+        </div>
+        <div class="metric-number text-rose font-mono">
+          {{ overview.totalHistoricalMatches | number }}
+        </div>
+        <div class="metric-meta">
+          <span>{{ getCoveredCompetitionsCount() }} Competitions Active</span>
+          <span class="text-muted">Zero Duplication</span>
+        </div>
+      </div>
+
+      <!-- Canonical Teams -->
+      <div class="card metric-card">
+        <div class="metric-top">
+          <span class="metric-label">Canonical Teams</span>
+          <span class="metric-pill pill-cyan">Identity Resolved</span>
+        </div>
+        <div class="metric-number text-cyan font-mono">
+          {{ overview.totalCanonicalTeams | number }}
+        </div>
+        <div class="metric-meta">
+          <a routerLink="/teams" class="link-hover">Explore Clubs &rarr;</a>
+        </div>
+      </div>
+
+      <!-- Competitions -->
+      <div class="card metric-card">
+        <div class="metric-top">
+          <span class="metric-label">Competitions</span>
+          <span class="metric-pill pill-emerald">Leagues &amp; Cups</span>
+        </div>
+        <div class="metric-number text-emerald font-mono">
+          {{ overview.totalCompetitions | number }}
+        </div>
+        <div class="metric-meta">
+          <a routerLink="/competitions" class="link-hover">View Competitions &rarr;</a>
+        </div>
+      </div>
+
+      <!-- Seasons & Comp-Seasons -->
+      <div class="card metric-card">
+        <div class="metric-top">
+          <span class="metric-label">Seasons</span>
+          <span class="metric-pill pill-amber">{{ overview.totalCompetitionSeasons | number }} Comp-Seasons</span>
+        </div>
+        <div class="metric-number text-amber font-mono">
+          {{ overview.totalSeasons | number }}
+        </div>
+        <div class="metric-meta">
+          <span>Boundary Protected</span>
+        </div>
+      </div>
+
+      <!-- Ingestion Batches -->
+      <div class="card metric-card">
+        <div class="metric-top">
+          <span class="metric-label">Ingestion Batches</span>
+          <span class="metric-pill pill-purple">Stacked &amp; Single</span>
+        </div>
+        <div class="metric-number text-purple font-mono">
+          {{ overview.totalImportBatches | number }}
+        </div>
+        <div class="metric-meta">
+          <span>{{ overview.totalQuarantinedRecords | number }} Quarantined</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: Historical Data Coverage -->
+    <div class="section-card">
+      <div class="card-header">
+        <div>
+          <span class="badge-tag">DATA MATRIX</span>
+          <h2 class="section-heading">Historical Football Data Coverage</h2>
+          <p class="section-sub">Inspected competition-seasons and available match records in MySQL database.</p>
+        </div>
+        <div class="header-actions">
+          <span class="badge badge-info">{{ overview.dataCoverage.length }} Competition Seasons</span>
+        </div>
+      </div>
+
+      <!-- Empty State for Coverage -->
+      <div *ngIf="overview.dataCoverage.length === 0" class="empty-state">
+        <div class="empty-icon">📂</div>
+        <h3>No Historical Data Ingested Yet</h3>
+        <p>No competition-seasons have imported matches in the database. Ingest single-season or stacked CSVs via Data Centre.</p>
+        <a routerLink="/data-centre" class="btn btn-primary mt-3">Go to Data Centre</a>
+      </div>
+
+      <!-- Data Coverage Table -->
+      <div *ngIf="overview.dataCoverage.length > 0" class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Competition</th>
+              <th>Country</th>
+              <th>Season Code</th>
+              <th>Season Label</th>
+              <th>Historical Matches</th>
+              <th>Earliest Match</th>
+              <th>Latest Match</th>
+              <th>Coverage Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of overview.dataCoverage">
+              <td class="font-bold text-white">{{ item.competitionName }}</td>
+              <td><span class="badge-country">{{ item.country }}</span></td>
+              <td class="font-mono text-rose font-semibold">{{ item.seasonCode }}</td>
+              <td class="text-white">{{ item.seasonName }}</td>
+              <td class="font-mono font-bold" [class.text-emerald]="item.matchCount > 0" [class.text-muted]="item.matchCount === 0">
+                {{ item.matchCount | number }} matches
+              </td>
+              <td class="font-mono text-xs text-muted">{{ item.firstMatchDate || '—' }}</td>
+              <td class="font-mono text-xs text-muted">{{ item.lastMatchDate || '—' }}</td>
+              <td>
+                <span *ngIf="item.matchCount > 0" class="badge badge-success">
+                  AVAILABLE ({{ item.matchCount }})
+                </span>
+                <span *ngIf="item.matchCount === 0" class="badge badge-secondary">
+                  NO MATCHES IMPORTED
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section 3 & 4 Grid: Recent Ingestion Operations + Research Shortcuts -->
+    <div class="two-col-grid">
+      <!-- Recent Import Activity -->
+      <div class="section-card">
+        <div class="card-header">
+          <div>
+            <span class="badge-tag">PIPELINE AUDIT</span>
+            <h3 class="section-heading">Recent Ingestion Activity</h3>
+          </div>
+          <a routerLink="/data-centre" class="card-link">View Ingestion Centre &rarr;</a>
+        </div>
+
+        <div *ngIf="overview.recentImports.length === 0" class="empty-state-mini">
+          <p class="text-muted">No recent import batches recorded.</p>
+        </div>
+
+        <div *ngIf="overview.recentImports.length > 0" class="recent-list">
+          <div *ngFor="let imp of overview.recentImports" class="recent-item">
+            <div class="recent-left">
+              <div class="recent-file font-mono">{{ imp.sourceFileName }}</div>
+              <div class="recent-sub text-xs text-muted">
+                <span *ngIf="imp.competitionName" class="text-white">{{ imp.competitionName }}</span>
+                <span *ngIf="imp.seasonCode"> • {{ imp.seasonCode }}</span>
+                <span> • Format: <code class="text-cyan">{{ imp.distributionFormat }}</code></span>
+              </div>
+            </div>
+            <div class="recent-right">
+              <span class="badge" [class.badge-success]="imp.status === 'COMPLETED'" [class.badge-warning]="imp.status === 'PARTIAL_SUCCESS'" [class.badge-danger]="imp.status === 'FAILED'">
+                {{ imp.status }}
+              </span>
+              <div class="recent-counts font-mono text-xs mt-1">
+                <span class="text-emerald">+{{ imp.importedRows }} imported</span>
+                <span *ngIf="imp.quarantinedRows > 0" class="text-amber"> • {{ imp.quarantinedRows }} quarantined</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Research Shortcuts & Tools -->
+      <div class="section-card">
+        <div class="card-header">
+          <div>
+            <span class="badge-tag">NAVIGATION</span>
+            <h3 class="section-heading">Football Research Destinations</h3>
+          </div>
+        </div>
+
+        <div class="shortcuts-grid">
+          <a routerLink="/teams" class="shortcut-card">
+            <div class="shortcut-icon text-cyan">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+            </div>
+            <div class="shortcut-info">
+              <h4 class="shortcut-title">Teams Registry</h4>
+              <p class="shortcut-desc">Inspect canonical clubs, verify normalized names, and configure provider aliases.</p>
+            </div>
+          </a>
+
+          <a routerLink="/competitions" class="shortcut-card">
+            <div class="shortcut-icon text-emerald">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
+                <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
+                <path d="M4 22h16"></path>
+                <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path>
+                <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path>
+                <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path>
+              </svg>
+            </div>
+            <div class="shortcut-info">
+              <h4 class="shortcut-title">Competitions &amp; Seasons</h4>
+              <p class="shortcut-desc">Explore verified league hierarchies, season date boundaries, and provider code mappings.</p>
+            </div>
+          </a>
+
+          <a routerLink="/data-centre" class="shortcut-card">
+            <div class="shortcut-icon text-rose">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+            </div>
+            <div class="shortcut-info">
+              <h4 class="shortcut-title">Data Centre Hub</h4>
+              <p class="shortcut-desc">Upload stacked multi-season CSVs, preview detected seasons, or download verified sets.</p>
+            </div>
+          </a>
+
+          <a routerLink="/system-diagnostics" class="shortcut-card">
+            <div class="shortcut-icon text-amber">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <rect x="3" y="3" width="7" height="9"></rect>
+                <rect x="14" y="3" width="7" height="5"></rect>
+                <rect x="14" y="12" width="7" height="9"></rect>
+                <rect x="3" y="16" width="7" height="5"></rect>
+              </svg>
+            </div>
+            <div class="shortcut-info">
+              <h4 class="shortcut-title">System &amp; Diagnostics</h4>
+              <p class="shortcut-desc">Inspect MySQL tables, Flyway migrations, backend runtime health, and identity testers.</p>
+            </div>
+          </a>
+        </div>
+      </div>
+    </div>
+  </ng-container>
+</div>

@@ -1,0 +1,247 @@
+<div class="database-explorer-container">
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="header-content">
+      <div class="badge-phase">PHASE 1 DELIVERABLE</div>
+      <h1 class="page-title">Database Foundation Explorer</h1>
+      <p class="page-subtitle">Live inspection of MySQL schema, tables, foreign keys, indexes, and Flyway migration provenance.</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-secondary" (click)="refreshAll()" [disabled]="loadingOverview || loadingTables">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+        Refresh Schema
+      </button>
+    </div>
+  </div>
+
+  <!-- Error Banner -->
+  <div *ngIf="errorMessage" class="alert alert-error">
+    <span>{{ errorMessage }}</span>
+  </div>
+
+  <!-- Database Overview Cards -->
+  <div class="overview-grid" *ngIf="overview">
+    <div class="card stat-card">
+      <div class="stat-label">Database Name</div>
+      <div class="stat-value highlight">{{ overview.databaseName }}</div>
+      <div class="stat-sub">Engine: {{ overview.databaseEngine }} ({{ overview.databaseVersion }})</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-label">Connection Status</div>
+      <div class="stat-value status-online">{{ overview.connectionStatus }}</div>
+      <div class="stat-sub">Encoding: {{ overview.characterSet }} / {{ overview.collation }}</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-label">Schema Metrics</div>
+      <div class="stat-value">{{ overview.totalTables }} <span class="unit">Tables</span></div>
+      <div class="stat-sub">{{ overview.totalColumns }} cols | {{ overview.totalIndexes }} idx | {{ overview.totalForeignKeys }} FKs</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-label">Flyway Migrations</div>
+      <div class="stat-value highlight">{{ overview.flywayStatus }}</div>
+      <div class="stat-sub">{{ overview.latestAppliedMigration }}</div>
+    </div>
+  </div>
+
+  <!-- Navigation Tabs -->
+  <div class="tab-navigation">
+    <button class="tab-btn" [class.active]="activeTab === 'tables'" (click)="activeTab = 'tables'">
+      Table Explorer & Structure
+    </button>
+    <button class="tab-btn" [class.active]="activeTab === 'relationships'" (click)="activeTab = 'relationships'">
+      Relational Foreign Keys ({{ relationships.length }})
+    </button>
+    <button class="tab-btn" [class.active]="activeTab === 'migrations'" (click)="activeTab = 'migrations'">
+      Flyway Migration History ({{ migrations.length }})
+    </button>
+  </div>
+
+  <!-- TAB 1: Table Explorer & Structure -->
+  <div *ngIf="activeTab === 'tables'" class="tab-content">
+    <div class="tables-layout">
+      <!-- Table List Sidebar -->
+      <div class="card table-list-card">
+        <div class="card-header">
+          <h3>Database Tables ({{ tables.length }})</h3>
+        </div>
+        <div class="table-list-items">
+          <div
+            *ngFor="let tbl of tables"
+            class="table-item"
+            [class.selected]="selectedTableName === tbl.tableName"
+            (click)="selectTable(tbl.tableName)">
+            <div class="table-item-name">
+              <span class="table-badge">{{ tbl.number }}</span>
+              <strong>{{ tbl.tableName }}</strong>
+            </div>
+            <div class="table-item-meta">
+              <span>{{ tbl.columnCount }} cols</span>
+              <span>{{ tbl.foreignKeyCount }} FKs</span>
+              <span>{{ tbl.approximateRowCount }} rows</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table Structure Detail -->
+      <div class="card table-structure-card">
+        <div class="card-header" *ngIf="selectedTableStructure">
+          <div>
+            <h3>Structure: <span class="highlight">{{ selectedTableStructure.tableName }}</span></h3>
+            <span class="card-sub">{{ selectedTableStructure.columns.length }} Columns | {{ selectedTableStructure.indexes.length }} Indexes</span>
+          </div>
+        </div>
+
+        <div *ngIf="loadingStructure" class="loading-state">
+          Loading table structure...
+        </div>
+
+        <div *ngIf="!loadingStructure && selectedTableStructure" class="structure-content">
+          <!-- Columns Table -->
+          <div class="section-title">Columns</div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Column Name</th>
+                  <th>Data Type</th>
+                  <th>Nullable</th>
+                  <th>Key / Constraint</th>
+                  <th>Default</th>
+                  <th>Foreign Key Reference</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let col of selectedTableStructure.columns">
+                  <td>{{ col.position }}</td>
+                  <td><strong>{{ col.columnName }}</strong></td>
+                  <td><code>{{ col.dataType }}</code></td>
+                  <td>
+                    <span [class.badge-yes]="col.nullable" [class.badge-no]="!col.nullable">
+                      {{ col.nullable ? 'YES' : 'NO' }}
+                    </span>
+                  </td>
+                  <td>
+                    <span *ngIf="col.primaryKey" class="badge-pk">PRIMARY KEY</span>
+                    <span *ngIf="col.foreignKey" class="badge-fk">FOREIGN KEY</span>
+                    <span *ngIf="col.indexed && !col.primaryKey && !col.foreignKey" class="badge-idx">INDEXED</span>
+                    <span *ngIf="!col.primaryKey && !col.foreignKey && !col.indexed" class="muted">-</span>
+                  </td>
+                  <td>{{ col.defaultValue || 'NULL' }}</td>
+                  <td>
+                    <span *ngIf="col.foreignKey" class="fk-ref">
+                      → <code>{{ col.referencedTable }}.{{ col.referencedColumn }}</code>
+                    </span>
+                    <span *ngIf="!col.foreignKey" class="muted">-</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Indexes Table -->
+          <div class="section-title" style="margin-top: 1.5rem;">Indexes & Unique Constraints</div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Index Name</th>
+                  <th>Column Name</th>
+                  <th>Type</th>
+                  <th>Seq In Index</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let idx of selectedTableStructure.indexes">
+                  <td><code>{{ idx.indexName }}</code></td>
+                  <td><strong>{{ idx.columnName }}</strong></td>
+                  <td>
+                    <span [class.badge-unique]="idx.unique" [class.badge-idx]="!idx.unique">
+                      {{ idx.unique ? 'UNIQUE' : 'NON-UNIQUE' }}
+                    </span>
+                  </td>
+                  <td>{{ idx.ordinalPosition }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: Relational Foreign Keys -->
+  <div *ngIf="activeTab === 'relationships'" class="tab-content">
+    <div class="card">
+      <div class="card-header">
+        <h3>Verified Database Foreign Key Relationships ({{ relationships.length }})</h3>
+        <span class="card-sub">Queried from MySQL information_schema.KEY_COLUMN_USAGE</span>
+      </div>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Source Table</th>
+              <th>Source Column</th>
+              <th></th>
+              <th>Referenced Table</th>
+              <th>Referenced Column</th>
+              <th>Constraint Name</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let rel of relationships">
+              <td><strong>{{ rel.sourceTable }}</strong></td>
+              <td><code>{{ rel.sourceColumn }}</code></td>
+              <td class="arrow-cell">→</td>
+              <td><strong class="highlight-alt">{{ rel.referencedTable }}</strong></td>
+              <td><code>{{ rel.referencedColumn }}</code></td>
+              <td><span class="badge-constraint">{{ rel.constraintName }}</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: Flyway Migration History -->
+  <div *ngIf="activeTab === 'migrations'" class="tab-content">
+    <div class="card">
+      <div class="card-header">
+        <h3>Flyway Versioned Schema Migrations ({{ migrations.length }})</h3>
+        <span class="card-sub">Audited from flyway_schema_history</span>
+      </div>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Version</th>
+              <th>Description</th>
+              <th>Type</th>
+              <th>Script</th>
+              <th>Installed On</th>
+              <th>Execution Time</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let mig of migrations">
+              <td><span class="badge-version">v{{ mig.version }}</span></td>
+              <td><strong>{{ mig.description }}</strong></td>
+              <td><code>{{ mig.type }}</code></td>
+              <td><code>{{ mig.script }}</code></td>
+              <td>{{ mig.installedOn | date:'yyyy-MM-dd HH:mm:ss' }}</td>
+              <td>{{ mig.executionTimeMs }} ms</td>
+              <td>
+                <span [class.badge-success]="mig.success" [class.badge-failed]="!mig.success">
+                  {{ mig.success ? 'SUCCESS' : 'FAILED' }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,462 @@
+<div class="ingestion-centre-container">
+  <header class="page-header">
+    <div class="header-titles">
+      <div class="header-badge">PHASE 3 HISTORICAL INGESTION ENGINE</div>
+      <h1>Data Centre &amp; Historical Ingestion</h1>
+      <p class="subtitle">Unified historical data management, stacked multi-season CSV separation, provider downloads, and quarantine audit.</p>
+    </div>
+    <div class="header-actions">
+      <button (click)="loadAll()" class="btn btn-secondary btn-sm">
+        <span>Refresh Data Centre</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs (7 Sub-Sections) -->
+  <nav class="nav-tabs">
+    <button [class.active]="activeTab === 'overview'" (click)="activeTab = 'overview'">
+      <i class="icon">📊</i> 1. Overview
+    </button>
+    <button [class.active]="activeTab === 'upload'" (click)="activeTab = 'upload'">
+      <i class="icon">📁</i> 2. Import CSV &amp; Preview
+    </button>
+    <button [class.active]="activeTab === 'catalog'" (click)="activeTab = 'catalog'">
+      <i class="icon">🌐</i> 3. Provider Catalogue
+    </button>
+    <button [class.active]="activeTab === 'history'" (click)="activeTab = 'history'">
+      <i class="icon">📜</i> 4. Import History
+    </button>
+    <button [class.active]="activeTab === 'batches'" (click)="activeTab = 'batches'">
+      <i class="icon">⚡</i> 5. Season Batch Monitor
+    </button>
+    <button [class.active]="activeTab === 'quarantine'" (click)="activeTab = 'quarantine'">
+      <i class="icon">🛡️</i> 6. Quarantine Manager
+    </button>
+    <button [class.active]="activeTab === 'coverage'" (click)="activeTab = 'coverage'">
+      <i class="icon">🗺️</i> 7. Data Coverage
+    </button>
+  </nav>
+
+  <!-- Notification Banners -->
+  <div *ngIf="successMessage" class="banner banner-success">
+    <span>{{ successMessage }}</span>
+    <button class="close-btn" (click)="successMessage = ''">&times;</button>
+  </div>
+  <div *ngIf="errorMessage" class="banner banner-error">
+    <span>{{ errorMessage }}</span>
+    <button class="close-btn" (click)="errorMessage = ''">&times;</button>
+  </div>
+  <div *ngIf="downloadMessage" class="banner banner-info">
+    <span>{{ downloadMessage }}</span>
+  </div>
+
+  <!-- SUB-SECTION 1: OVERVIEW -->
+  <section *ngIf="activeTab === 'overview'" class="tab-content dashboard-tab">
+    <div class="metrics-grid" *ngIf="stats">
+      <div class="metric-card">
+        <span class="metric-title">Source Files Received</span>
+        <span class="metric-value font-mono">{{ stats.totalPhysicalFilesReceived | number }}</span>
+        <span class="metric-sub">{{ stats.seasonSpecificFilesCount }} Single-Season / {{ stats.stackedFilesCount }} Stacked</span>
+      </div>
+
+      <div class="metric-card accent-card">
+        <span class="metric-title">Logical Season Batches</span>
+        <span class="metric-value font-mono">{{ stats.totalSeasonBatches | number }}</span>
+        <span class="metric-sub">{{ stats.completedBatches }} Completed / {{ stats.partialSuccessBatches }} Partial</span>
+      </div>
+
+      <div class="metric-card success-card">
+        <span class="metric-title">Imported Matches</span>
+        <span class="metric-value font-mono">{{ stats.totalImportedMatches | number }}</span>
+        <span class="metric-sub">{{ stats.totalDuplicateMatches | number }} Idempotent Duplicates Avoided</span>
+      </div>
+
+      <div class="metric-card warning-card">
+        <span class="metric-title">Quarantined Records</span>
+        <span class="metric-value font-mono">{{ stats.totalQuarantinedRecords | number }}</span>
+        <span class="metric-sub">{{ stats.totalFailedRecords }} Failed / Unresolved</span>
+      </div>
+    </div>
+
+    <!-- Engine Architecture Guarantees -->
+    <div class="content-box">
+      <h2>Architectural Verification &amp; Ingestion Principles</h2>
+      <div class="principles-grid">
+        <div class="principle-item">
+          <h3>1. Stacked Separation</h3>
+          <p>Stacked multi-season CSVs are parsed row-by-row, grouped by normalized season identity, and ingested as strictly isolated season-specific batches.</p>
+        </div>
+        <div class="principle-item">
+          <h3>2. Zero Season Guesswork</h3>
+          <p>Calendar seasons (e.g. 2025) are preserved and never coerced into European seasons (2025/2026). Match dates are validated against competition season boundaries.</p>
+        </div>
+        <div class="principle-item">
+          <h3>3. Idempotent Deduplication</h3>
+          <p>Deterministic natural match keys (<code>Competition_Season_Date_Home_Away</code>) and source record hashing guarantee zero duplicate matches upon re-import.</p>
+        </div>
+        <div class="principle-item">
+          <h3>4. Full Provenance Traceability</h3>
+          <p>Every imported match and quarantine row retains its physical source file name, row number, and raw source values for auditing and one-click correction.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SUB-SECTION 2: IMPORT CSV & STACKED PREVIEW -->
+  <section *ngIf="activeTab === 'upload'" class="tab-content upload-tab">
+    <div class="content-box upload-box">
+      <h2>Manual CSV File Inspection &amp; Ingestion</h2>
+      <p class="description">Select any Football-Data.co.uk single-season or stacked multi-season CSV. The engine will inspect headers, detect seasons, evaluate data eligibility, and show preview breakdown.</p>
+
+      <div class="upload-controls">
+        <div class="file-input-wrapper">
+          <input type="file" (change)="onFileSelected($event)" accept=".csv" id="csvFileInput" />
+          <label for="csvFileInput" class="btn btn-primary">
+            📁 Choose CSV File
+          </label>
+          <span class="file-name" *ngIf="selectedFile">{{ selectedFile.name }} ({{ selectedFile.size | number }} bytes)</span>
+        </div>
+
+        <div class="context-inputs">
+          <div class="input-group">
+            <label>Optional Season Override:</label>
+            <input type="text" [(ngModel)]="uploadedSeasonContext" placeholder="e.g. 2024-2025 (Blank = Auto-detect)" />
+          </div>
+          <div class="input-group">
+            <label>Optional Comp Override:</label>
+            <input type="text" [(ngModel)]="uploadedCompetitionContext" placeholder="e.g. Premier League / E0 (Blank = Auto)" />
+          </div>
+        </div>
+
+        <button *ngIf="selectedFile" class="btn btn-secondary" (click)="validateFile()" [disabled]="isValidating">
+          <span *ngIf="isValidating">Validating CSV...</span>
+          <span *ngIf="!isValidating">Re-Inspect CSV</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Validation & Stacked Breakdown Report -->
+    <div *ngIf="validationReport" class="content-box report-box">
+      <div class="report-header">
+        <div>
+          <h2>CSV Inspection &amp; Season Breakdown</h2>
+          <span class="badge" [ngClass]="validationReport.valid ? 'badge-success' : 'badge-error'">
+            {{ validationReport.distributionFormat }}
+          </span>
+        </div>
+        <button class="btn btn-success btn-large" (click)="startImport()" [disabled]="isImporting || !validationReport.valid">
+          <span *ngIf="isImporting">Executing Batch Ingestion...</span>
+          <span *ngIf="!isImporting">Execute Ingestion Pipeline ({{ validationReport.totalRows | number }} Rows)</span>
+        </button>
+      </div>
+
+      <div class="report-meta-grid">
+        <div class="meta-item">
+          <span class="label">Total Rows:</span>
+          <span class="value font-mono">{{ validationReport.totalRows | number }}</span>
+        </div>
+        <div class="meta-item">
+          <span class="label">Distribution Format:</span>
+          <span class="value font-mono text-cyan">{{ validationReport.distributionFormat }}</span>
+        </div>
+        <div class="meta-item">
+          <span class="label">File Checksum:</span>
+          <span class="value font-mono text-xs text-muted">{{ validationReport.fileChecksum | slice:0:20 }}...</span>
+        </div>
+        <div class="meta-item">
+          <span class="label">Detected Seasons:</span>
+          <span class="value font-mono text-emerald">{{ validationReport.seasonSummaries.length }}</span>
+        </div>
+      </div>
+
+      <!-- Detected Stacked Seasons -->
+      <div class="seasons-breakdown" *ngIf="validationReport.seasonSummaries.length > 0">
+        <h3>Detected Isolated Seasons ({{ validationReport.seasonSummaries.length }})</h3>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Season Context</th>
+                <th>Detected Rows</th>
+                <th>Eligibility</th>
+                <th>Eligibility Details</th>
+                <th>Isolation Batch Mode</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let s of validationReport.seasonSummaries">
+                <td class="font-bold text-white">{{ s.suppliedSeasonLabel }} ({{ s.canonicalSeasonCode || 'Auto' }})</td>
+                <td class="font-mono text-emerald">{{ s.detectedRowCount | number }}</td>
+                <td>
+                  <span class="badge" [class.badge-success]="s.eligible" [class.badge-danger]="!s.eligible">
+                    {{ s.eligible ? 'ELIGIBLE' : 'INELIGIBLE' }}
+                  </span>
+                </td>
+                <td class="text-xs text-muted">{{ s.eligibilityReason }}</td>
+                <td><span class="badge badge-info">ISOLATED SEASON BATCH</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SUB-SECTION 3: PROVIDER CATALOGUE -->
+  <section *ngIf="activeTab === 'catalog'" class="tab-content catalog-tab">
+    <div class="content-box">
+      <h2>Football-Data.co.uk Verified Source Catalogue</h2>
+      <p class="description">Select any verified historical season file to download and ingest directly into the normalized database.</p>
+
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Country</th>
+              <th>Competition</th>
+              <th>Div Code</th>
+              <th>Season Label</th>
+              <th>Type</th>
+              <th>Source URL</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of catalog">
+              <td><span class="badge-country">{{ item.country }}</span></td>
+              <td class="font-bold text-white">{{ item.competitionName }}</td>
+              <td class="font-mono text-cyan">{{ item.competitionCode }}</td>
+              <td class="font-mono text-rose">{{ item.seasonLabel }}</td>
+              <td>
+                <span class="badge" [class.badge-info]="item.distributionFormat === 'SEASON_SPECIFIC'" [class.badge-warning]="item.distributionFormat === 'STACKED_MULTI_SEASON'">
+                  {{ item.distributionFormat }}
+                </span>
+              </td>
+              <td class="font-mono text-xs text-muted">{{ item.downloadUrl | slice:0:45 }}...</td>
+              <td>
+                <button class="btn btn-primary btn-sm" (click)="downloadSource(item)" [disabled]="isDownloading">
+                  Download &amp; Ingest
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- SUB-SECTION 4: IMPORT HISTORY (PHYSICAL FILES) -->
+  <section *ngIf="activeTab === 'history'" class="tab-content history-tab">
+    <div class="content-box">
+      <h2>Physical File Import History (Import Groups)</h2>
+      <p class="description">Every physical CSV upload or download creates an Import Group which tracks overall checksum, provenance, and generated logical batches.</p>
+
+      <div *ngIf="importGroups.length === 0" class="empty-state">
+        <p>No historical physical files recorded yet.</p>
+      </div>
+
+      <div *ngIf="importGroups.length > 0" class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Group ID</th>
+              <th>Source Name</th>
+              <th>Source File Name</th>
+              <th>Format</th>
+              <th>Total Rows</th>
+              <th>Generated Batches</th>
+              <th>Status</th>
+              <th>Imported At</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let grp of importGroups">
+              <td class="font-mono text-muted">#{{ grp.id }}</td>
+              <td><span class="badge badge-info">{{ grp.sourceName }}</span></td>
+              <td class="font-mono font-bold text-white">{{ grp.sourceFileName }}</td>
+              <td>
+                <span class="badge" [class.badge-warning]="grp.distributionFormat === 'STACKED_MULTI_SEASON'" [class.badge-info]="grp.distributionFormat !== 'STACKED_MULTI_SEASON'">
+                  {{ grp.distributionFormat }}
+                </span>
+              </td>
+              <td class="font-mono">{{ grp.totalPhysicalRows | number }}</td>
+              <td class="font-mono font-bold text-emerald">{{ grp.batches.length }} batches</td>
+              <td>
+                <span class="badge" [class.badge-success]="grp.status === 'COMPLETED'" [class.badge-warning]="grp.status === 'PARTIAL_SUCCESS'" [class.badge-danger]="grp.status === 'FAILED'">
+                  {{ grp.status }}
+                </span>
+              </td>
+              <td class="font-mono text-xs text-muted">{{ grp.createdAt | date:'yyyy-MM-dd HH:mm' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- SUB-SECTION 5: SEASON BATCH MONITOR -->
+  <section *ngIf="activeTab === 'batches'" class="tab-content batches-tab">
+    <div class="content-box">
+      <h2>Logical Season Batch Monitor</h2>
+      <p class="description">Inspect individual season-specific batches isolated from single-season or stacked multi-season CSVs.</p>
+
+      <div *ngIf="importBatches.length === 0" class="empty-state">
+        <p>No season batches recorded yet.</p>
+      </div>
+
+      <div *ngIf="importBatches.length > 0" class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Batch ID</th>
+              <th>Source File</th>
+              <th>Competition</th>
+              <th>Season</th>
+              <th>Format</th>
+              <th>Status</th>
+              <th>Rows (Total/Ins/Upd)</th>
+              <th>Quarantined</th>
+              <th>Started At</th>
+              <th>Completed At</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let b of importBatches">
+              <td class="font-mono text-muted">#{{ b.id }}</td>
+              <td class="font-mono text-xs text-white">{{ b.sourceFileName }}</td>
+              <td class="font-bold text-white">{{ b.competitionName || 'N/A' }}</td>
+              <td class="font-mono text-rose">{{ b.seasonCode || 'N/A' }}</td>
+              <td>
+                <span class="badge badge-secondary">{{ b.distributionFormat }}</span>
+              </td>
+              <td>
+                <span class="badge" [class.badge-success]="b.status === 'COMPLETED'" [class.badge-warning]="b.status === 'PARTIAL_SUCCESS'" [class.badge-danger]="b.status === 'FAILED'">
+                  {{ b.status }}
+                </span>
+              </td>
+              <td class="font-mono">
+                {{ b.totalRows }} ({{ b.insertedRows }} + {{ b.updatedRows }})
+              </td>
+              <td class="font-mono" [class.text-amber]="b.quarantinedRows > 0" [class.text-muted]="b.quarantinedRows === 0">
+                {{ b.quarantinedRows }}
+              </td>
+              <td class="font-mono text-xs text-muted">{{ b.startedAt | date:'yyyy-MM-dd HH:mm' }}</td>
+              <td class="font-mono text-xs text-muted">{{ b.completedAt ? (b.completedAt | date:'yyyy-MM-dd HH:mm') : '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- SUB-SECTION 6: QUARANTINE MANAGER -->
+  <section *ngIf="activeTab === 'quarantine'" class="tab-content quarantine-tab">
+    <div class="content-box">
+      <div class="quarantine-header">
+        <div>
+          <h2>Quarantine Records &amp; Resolution Retry</h2>
+          <p class="description">Rows failing identity resolution or data integrity checks are isolated here with full source provenance.</p>
+        </div>
+        <span class="badge badge-warning">{{ quarantineRecords.length }} Quarantined</span>
+      </div>
+
+      <div *ngIf="quarantineRecords.length === 0" class="empty-state">
+        <div class="empty-icon">🛡️</div>
+        <h3>Zero Quarantine Records</h3>
+        <p>All imported rows have been successfully canonicalised and inserted into the historical match repository.</p>
+      </div>
+
+      <div *ngIf="quarantineRecords.length > 0" class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Source File</th>
+              <th>Row #</th>
+              <th>Category</th>
+              <th>Quarantine Reason</th>
+              <th>Raw Data</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let q of quarantineRecords">
+              <td class="font-mono text-muted">#{{ q.id }}</td>
+              <td class="font-mono text-xs text-white">{{ q.sourceFileName }}</td>
+              <td class="font-mono text-cyan">{{ q.sourceRowNumber }}</td>
+              <td><span class="badge badge-secondary">{{ q.failureCategory }}</span></td>
+              <td class="text-xs text-amber">{{ q.failureReason }}</td>
+              <td class="font-mono text-xs text-muted">{{ q.rawData | slice:0:30 }}...</td>
+              <td>
+                <span class="badge" [class.badge-warning]="q.resolutionStatus === 'QUARANTINED'" [class.badge-success]="q.resolutionStatus === 'RESOLVED'">
+                  {{ q.resolutionStatus }}
+                </span>
+              </td>
+              <td>
+                <button class="btn btn-secondary btn-xs" (click)="retryQuarantine(q)">
+                  Retry Resolution
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- SUB-SECTION 7: DATA COVERAGE -->
+  <section *ngIf="activeTab === 'coverage'" class="tab-content coverage-tab">
+    <div class="content-box">
+      <div class="card-header">
+        <div>
+          <h2>Historical Football Data Coverage Matrix</h2>
+          <p class="description">Live breakdown of matches imported per competition and season from the normalized database.</p>
+        </div>
+        <span class="badge badge-info">{{ dataCoverage.length }} Competition Seasons</span>
+      </div>
+
+      <div *ngIf="dataCoverage.length === 0" class="empty-state">
+        <p>No historical coverage data available.</p>
+      </div>
+
+      <div *ngIf="dataCoverage.length > 0" class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Competition</th>
+              <th>Country</th>
+              <th>Season Code</th>
+              <th>Season Name</th>
+              <th>Imported Matches</th>
+              <th>Earliest Match</th>
+              <th>Latest Match</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of dataCoverage">
+              <td class="font-bold text-white">{{ item.competitionName }}</td>
+              <td><span class="badge-country">{{ item.country }}</span></td>
+              <td class="font-mono text-rose font-semibold">{{ item.seasonCode }}</td>
+              <td class="text-white">{{ item.seasonName }}</td>
+              <td class="font-mono font-bold" [class.text-emerald]="item.matchCount > 0" [class.text-muted]="item.matchCount === 0">
+                {{ item.matchCount | number }} matches
+              </td>
+              <td class="font-mono text-xs text-muted">{{ item.firstMatchDate || '—' }}</td>
+              <td class="font-mono text-xs text-muted">{{ item.lastMatchDate || '—' }}</td>
+              <td>
+                <span *ngIf="item.matchCount > 0" class="badge badge-success">
+                  AVAILABLE ({{ item.matchCount }})
+                </span>
+                <span *ngIf="item.matchCount === 0" class="badge badge-secondary">
+                  NO MATCHES IMPORTED
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>

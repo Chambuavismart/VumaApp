@@ -1,0 +1,461 @@
+<div class="diagnostics-page">
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="header-titles">
+      <div class="header-badge">ENGINE LEVEL 0–2 DIAGNOSTICS</div>
+      <h1 class="page-title">System &amp; Diagnostics Hub</h1>
+      <p class="subtitle">Technical inspection centre for backend services, database schema, Flyway migrations, and identity resolution engines.</p>
+    </div>
+    <div class="header-actions">
+      <button (click)="refreshHealth(); loadDatabaseInfo()" class="btn btn-primary" [disabled]="loadingStatus || loadingOverview">
+        <svg class="w-4 h-4 mr-2" [class.animate-spin]="loadingStatus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+        <span>Run Diagnostics</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Diagnostic Sub-Navigation -->
+  <div class="nav-tabs">
+    <button [class.active]="activeTab === 'health'" (click)="activeTab = 'health'">
+      <i class="icon">🩺</i> System Health
+    </button>
+    <button [class.active]="activeTab === 'tables'" (click)="activeTab = 'tables'">
+      <i class="icon">🗄️</i> Database Foundation
+    </button>
+    <button [class.active]="activeTab === 'relationships'" (click)="activeTab = 'relationships'">
+      <i class="icon">🔗</i> FK Relationships
+    </button>
+    <button [class.active]="activeTab === 'migrations'" (click)="activeTab = 'migrations'">
+      <i class="icon">📜</i> Flyway Migrations
+    </button>
+    <button [class.active]="activeTab === 'resolution'" (click)="activeTab = 'resolution'">
+      <i class="icon">🔍</i> Identity Diagnostics
+    </button>
+    <button [class.active]="activeTab === 'config'" (click)="activeTab = 'config'">
+      <i class="icon">⚙️</i> Configuration &amp; APIs
+    </button>
+  </div>
+
+  <!-- Messages -->
+  <div *ngIf="errorMessage" class="banner banner-error">
+    <span>{{ errorMessage }}</span>
+    <button class="close-btn" (click)="errorMessage = null">&times;</button>
+  </div>
+
+  <!-- TAB 1: SYSTEM HEALTH -->
+  <div *ngIf="activeTab === 'health'" class="tab-content">
+    <div class="metrics-grid" *ngIf="status">
+      <!-- Database Status -->
+      <div class="metric-card">
+        <div class="card-header">
+          <span class="metric-label">MySQL Database</span>
+          <span class="badge" [class.badge-success]="status.database?.status === 'ONLINE'" [class.badge-danger]="status.database?.status !== 'ONLINE'">
+            {{ status.database?.status || 'OFFLINE' }}
+          </span>
+        </div>
+        <div class="metric-value font-mono" [class.text-emerald]="status.database?.status === 'ONLINE'" [class.text-rose]="status.database?.status !== 'ONLINE'">
+          {{ status.database?.status === 'ONLINE' ? status.database?.databaseName : 'Vumaapp (Offline)' }}
+        </div>
+        <div class="metric-footer font-mono">
+          <span>Latency: {{ status.database?.pingTimeMs ?? 'N/A' }}ms</span>
+          <span>Version: {{ status.database?.databaseProductVersion || '8.0+' }}</span>
+        </div>
+      </div>
+
+      <!-- Spring Boot Backend -->
+      <div class="metric-card">
+        <div class="card-header">
+          <span class="metric-label">Spring Boot Backend</span>
+          <span class="badge" [class.badge-info]="status.status === 'HEALTHY'" [class.badge-danger]="status.status !== 'HEALTHY'">
+            {{ status.status === 'HEALTHY' ? 'v' + status.springBootVersion : 'OFFLINE' }}
+          </span>
+        </div>
+        <div class="metric-value font-mono" [class.text-cyan]="status.status === 'HEALTHY'" [class.text-rose]="status.status !== 'HEALTHY'">
+          {{ status.status === 'HEALTHY' ? 'Java ' + status.javaVersion : 'Unreachable' }}
+        </div>
+        <div class="metric-footer font-mono">
+          <span>Port: 8080</span>
+          <span>App: {{ status.applicationName }}</span>
+        </div>
+      </div>
+
+      <!-- Schema State -->
+      <div class="metric-card">
+        <div class="card-header">
+          <span class="metric-label">Schema &amp; Tables</span>
+          <span class="badge badge-success">Flyway Synced</span>
+        </div>
+        <div class="metric-value font-mono text-emerald">
+          {{ overview?.totalTables ?? '12' }} Tables
+        </div>
+        <div class="metric-footer font-mono">
+          <span>Columns: {{ overview?.totalColumns ?? 0 }}</span>
+          <span>Migrations: {{ migrations.length }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Health Breakdown Cards -->
+    <div class="details-grid">
+      <div class="card">
+        <h3 class="section-title">Connectivity &amp; Runtime Details</h3>
+        <table class="simple-table font-mono text-sm">
+          <tbody>
+            <tr>
+              <td class="text-muted">Target Environment:</td>
+              <td class="text-white">Local / Development (Port 8080 &amp; 4200)</td>
+            </tr>
+            <tr>
+              <td class="text-muted">Database JDBC URL:</td>
+              <td class="text-emerald">jdbc:mysql://localhost:3306/Vumaapp</td>
+            </tr>
+            <tr>
+              <td class="text-muted">Database Engine:</td>
+              <td class="text-white">MySQL Community Server 8.0.46 (InnoDB)</td>
+            </tr>
+            <tr>
+              <td class="text-muted">JDK Platform:</td>
+              <td class="text-white">Java 21 (LTS) HotSpot 64-Bit Server VM</td>
+            </tr>
+            <tr>
+              <td class="text-muted">Hibernate DDL:</td>
+              <td class="text-cyan">validate (Strict Production Schema Alignment)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3 class="section-title">Phase Foundation Readiness</h3>
+        <div class="readiness-list">
+          <div class="readiness-item">
+            <span class="dot bg-emerald"></span>
+            <div>
+              <strong>Phase 0 — Project Foundation:</strong>
+              <p class="text-xs text-muted">Spring Boot 3.4.2 + Angular standalone shell + Flyway baseline.</p>
+            </div>
+          </div>
+          <div class="readiness-item">
+            <span class="dot bg-emerald"></span>
+            <div>
+              <strong>Phase 1 &amp; 1.1 — Normalized Database:</strong>
+              <p class="text-xs text-muted">Complete 3NF schema, 8 core tables, composite FK constraints, verified integrity.</p>
+            </div>
+          </div>
+          <div class="readiness-item">
+            <span class="dot bg-emerald"></span>
+            <div>
+              <strong>Phase 2 — Canonical Identity Engine:</strong>
+              <p class="text-xs text-muted">Deterministic resolution for clubs, competitions, seasons, and aliases.</p>
+            </div>
+          </div>
+          <div class="readiness-item">
+            <span class="dot bg-emerald"></span>
+            <div>
+              <strong>Phase 3 — Historical CSV Ingestion:</strong>
+              <p class="text-xs text-muted">Stacked season separation, physical-to-logical batch tracking, quarantine retry.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: DATABASE FOUNDATION EXPLORER -->
+  <div *ngIf="activeTab === 'tables'" class="tab-content">
+    <div class="explorer-grid">
+      <!-- Left: Table List -->
+      <div class="card explorer-sidebar">
+        <h3 class="section-title">Schema Tables ({{ tables.length }})</h3>
+        <div class="table-list">
+          <div 
+            *ngFor="let t of tables" 
+            class="table-list-item" 
+            [class.active]="selectedTableName === t.tableName"
+            (click)="selectTable(t.tableName)"
+          >
+            <div class="t-name font-mono">{{ t.tableName }}</div>
+            <div class="t-meta">
+              <span>{{ t.approximateRowCount | number }} rows</span>
+              <span class="text-muted">{{ t.columnCount }} cols</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Table Structure -->
+      <div class="card explorer-main">
+        <div *ngIf="selectedTableStructure" class="structure-view">
+          <div class="structure-header">
+            <div>
+              <span class="text-xs font-mono text-rose">TABLE DETAILS</span>
+              <h2 class="table-title font-mono">{{ selectedTableStructure.tableName }}</h2>
+            </div>
+            <div class="structure-stats font-mono text-xs">
+              <span>{{ selectedTableStructure.columns.length }} Columns</span>
+              <span>•</span>
+              <span>{{ selectedTableStructure.indexes.length }} Indexes</span>
+            </div>
+          </div>
+
+          <!-- Columns Table -->
+          <h4 class="sub-heading">Columns &amp; Data Types</h4>
+          <div class="data-table-wrapper">
+            <table class="data-table font-mono text-xs">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Column Name</th>
+                  <th>Data Type</th>
+                  <th>Nullable</th>
+                  <th>Key / Constraint</th>
+                  <th>Default</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let col of selectedTableStructure.columns; let i = index">
+                  <td class="text-muted">{{ i + 1 }}</td>
+                  <td class="text-white font-bold">{{ col.columnName }}</td>
+                  <td class="text-cyan">{{ col.dataType }}</td>
+                  <td>
+                    <span class="badge" [class.badge-secondary]="col.nullable" [class.badge-danger]="!col.nullable">
+                      {{ col.nullable ? 'NULL' : 'NOT NULL' }}
+                    </span>
+                  </td>
+                  <td>
+                    <span *ngIf="col.primaryKey" class="badge badge-warning">PK</span>
+                    <span *ngIf="col.foreignKey" class="badge badge-info">FK &rarr; {{ col.referencedTable }}.{{ col.referencedColumn }}</span>
+                    <span *ngIf="!col.primaryKey && !col.foreignKey" class="text-muted">—</span>
+                  </td>
+                  <td class="text-muted">{{ col.defaultValue || '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: RELATIONSHIPS -->
+  <div *ngIf="activeTab === 'relationships'" class="tab-content">
+    <div class="card">
+      <h3 class="section-title">Foreign Key Relationships &amp; Referential Integrity</h3>
+      <p class="description">Active relational constraints enforced in MySQL 8.0 engine for VumaPhaseTwo.</p>
+      
+      <div class="data-table-wrapper">
+        <table class="data-table font-mono text-xs">
+          <thead>
+            <tr>
+              <th>Constraint Name</th>
+              <th>Foreign Key Table</th>
+              <th>Foreign Key Column</th>
+              <th>Referenced Table</th>
+              <th>Referenced Column</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let rel of relationships">
+              <td class="text-amber">{{ rel.constraintName }}</td>
+              <td class="text-white font-bold">{{ rel.sourceTable }}</td>
+              <td class="text-cyan">{{ rel.sourceColumn }}</td>
+              <td class="text-white font-bold">{{ rel.referencedTable }}</td>
+              <td class="text-emerald">{{ rel.referencedColumn }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 4: MIGRATIONS -->
+  <div *ngIf="activeTab === 'migrations'" class="tab-content">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="section-title">Flyway Schema Migration History</h3>
+        <span class="badge badge-success">{{ migrations.length }} Migrations Applied</span>
+      </div>
+      <div class="data-table-wrapper">
+        <table class="data-table font-mono text-xs">
+          <thead>
+            <tr>
+              <th>Version</th>
+              <th>Description</th>
+              <th>Type</th>
+              <th>Script</th>
+              <th>Checksum</th>
+              <th>Installed On</th>
+              <th>Execution Time</th>
+              <th>State</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let m of migrations">
+              <td class="text-rose font-bold">V{{ m.version }}</td>
+              <td class="text-white">{{ m.description }}</td>
+              <td class="text-muted">{{ m.type }}</td>
+              <td class="text-muted">{{ m.script }}</td>
+              <td class="text-muted">{{ m.checksum }}</td>
+              <td class="text-cyan">{{ m.installedOn }}</td>
+              <td class="text-muted">{{ m.executionTimeMs }}ms</td>
+              <td>
+                <span class="badge badge-success">SUCCESS</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 5: IDENTITY RESOLUTION DIAGNOSTICS -->
+  <div *ngIf="activeTab === 'resolution'" class="tab-content">
+    <div class="card mb-4">
+      <h3 class="section-title">Interactive Identity Resolution Diagnostics</h3>
+      <p class="description">Test how raw CSV provider strings are canonicalised through normalization algorithms, alias indexes, and season date boundary evaluators.</p>
+    </div>
+
+    <div class="resolution-grid">
+      <!-- Team Resolver -->
+      <div class="card">
+        <h4 class="sub-heading">1. Club Identity Resolver</h4>
+        <div class="form-group">
+          <label>Raw Club Name (from CSV)</label>
+          <input type="text" [(ngModel)]="testTeamRaw" class="form-input" placeholder="e.g. Man United, Wolverhampton" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Country Context</label>
+            <input type="text" [(ngModel)]="testTeamCountry" class="form-input" placeholder="e.g. England" />
+          </div>
+          <div class="form-group">
+            <label>Competition Context</label>
+            <input type="text" [(ngModel)]="testTeamComp" class="form-input" placeholder="e.g. Premier League" />
+          </div>
+        </div>
+        <button (click)="testResolveTeam()" class="btn btn-primary btn-sm mt-2" [disabled]="resolvingTeam">
+          <span>Resolve Team</span>
+        </button>
+
+        <div *ngIf="teamResult" class="result-box mt-3 font-mono text-xs">
+          <div class="result-status" [class.text-emerald]="teamResult.status === 'RESOLVED'" [class.text-rose]="teamResult.status !== 'RESOLVED'">
+            STATUS: {{ teamResult.status }}
+          </div>
+          <div *ngIf="teamResult.status === 'RESOLVED'" class="result-details mt-2">
+            <div>Canonical ID: #{{ teamResult.resolvedTeamId }}</div>
+            <div>Canonical Name: <strong>{{ teamResult.resolvedTeamName }}</strong></div>
+            <div>Normalized: {{ teamResult.normalizedName }}</div>
+            <div>Explanation: {{ teamResult.explanation }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Competition Resolver -->
+      <div class="card">
+        <h4 class="sub-heading">2. Competition Identity Resolver</h4>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Name or Div Code (e.g. E0, Premier League)</label>
+            <input type="text" [(ngModel)]="testCompRaw" class="form-input" placeholder="e.g. E0, Premier League" />
+          </div>
+          <div class="form-group">
+            <label>Country Context</label>
+            <input type="text" [(ngModel)]="testCompCountry" class="form-input" placeholder="e.g. England" />
+          </div>
+        </div>
+        <button (click)="testResolveCompetition()" class="btn btn-primary btn-sm mt-2" [disabled]="resolvingComp">
+          <span>Resolve Competition</span>
+        </button>
+
+        <div *ngIf="compResult" class="result-box mt-3 font-mono text-xs">
+          <div class="result-status" [class.text-emerald]="compResult.status === 'RESOLVED'" [class.text-rose]="compResult.status !== 'RESOLVED'">
+            STATUS: {{ compResult.status }}
+          </div>
+          <div *ngIf="compResult.status === 'RESOLVED'" class="result-details mt-2">
+            <div>Competition ID: #{{ compResult.resolvedCompetitionId }}</div>
+            <div>Canonical Name: <strong>{{ compResult.resolvedCompetitionName }}</strong></div>
+            <div>Country: {{ compResult.resolvedCompetitionCountry }}</div>
+            <div>Explanation: {{ compResult.explanation }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Season Resolver -->
+      <div class="card">
+        <h4 class="sub-heading">3. Season Identity &amp; Date Boundary Resolver</h4>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Raw Season Code</label>
+            <input type="text" [(ngModel)]="testSeasonRaw" class="form-input" placeholder="e.g. 2024-2025, 2425" />
+          </div>
+          <div class="form-group">
+            <label>Match Date</label>
+            <input type="date" [(ngModel)]="testSeasonDate" class="form-input" />
+          </div>
+        </div>
+        <button (click)="testResolveSeason()" class="btn btn-primary btn-sm mt-2" [disabled]="resolvingSeason">
+          <span>Resolve Season</span>
+        </button>
+
+        <div *ngIf="seasonResult" class="result-box mt-3 font-mono text-xs">
+          <div class="result-status" [class.text-emerald]="seasonResult.status === 'RESOLVED'" [class.text-rose]="seasonResult.status !== 'RESOLVED'">
+            STATUS: {{ seasonResult.status }}
+          </div>
+          <div *ngIf="seasonResult.status === 'RESOLVED'" class="result-details mt-2">
+            <div>Season ID: #{{ seasonResult.resolvedSeasonId }}</div>
+            <div>Season Code: <strong>{{ seasonResult.resolvedSeasonCode }}</strong></div>
+            <div>Season Name: {{ seasonResult.resolvedSeasonName }}</div>
+            <div>Dates: {{ seasonResult.startDate }} &rarr; {{ seasonResult.endDate }}</div>
+            <div>Explanation: {{ seasonResult.explanation }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 6: CONFIG & APIS -->
+  <div *ngIf="activeTab === 'config'" class="tab-content">
+    <div class="card">
+      <h3 class="section-title">System Configuration &amp; Technical Endpoints</h3>
+      
+      <div class="params-table mt-3">
+        <div class="param-row">
+          <span class="param-label">Target Database</span>
+          <span class="param-val font-mono text-emerald">MySQL 8.0.46 — Vumaapp</span>
+        </div>
+        <div class="param-row">
+          <span class="param-label">JDBC URL</span>
+          <span class="param-val font-mono">jdbc:mysql://localhost:3306/Vumaapp</span>
+        </div>
+        <div class="param-row">
+          <span class="param-label">Backend REST API</span>
+          <span class="param-val font-mono">http://localhost:8080</span>
+        </div>
+        <div class="param-row">
+          <span class="param-label">Actuator Health Check</span>
+          <span class="param-val font-mono">http://localhost:8080/actuator/health</span>
+        </div>
+        <div class="param-row">
+          <span class="param-label">Dashboard Aggregation API</span>
+          <span class="param-val font-mono text-cyan">GET /api/v1/dashboard/overview</span>
+        </div>
+        <div class="param-row">
+          <span class="param-label">Data Ingestion API</span>
+          <span class="param-val font-mono text-cyan">GET /api/v1/ingestion/dashboard/stats</span>
+        </div>
+        <div class="param-row">
+          <span class="param-label">Identity Resolution API</span>
+          <span class="param-val font-mono text-cyan">POST /api/v1/identity/teams/resolve</span>
+        </div>
+        <div class="param-row">
+          <span class="param-label">Database Inspection API</span>
+          <span class="param-val font-mono text-cyan">GET /api/v1/database/overview</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

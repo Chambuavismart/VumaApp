@@ -1,0 +1,40 @@
+CREATE TABLE import_batches (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    source_name VARCHAR(50) NOT NULL,
+    source_file_name VARCHAR(255) NOT NULL,
+    source_file_checksum VARCHAR(64) NOT NULL,
+    competition_id BIGINT NULL,
+    season_id BIGINT NULL,
+    competition_season_id BIGINT NULL,
+    import_type VARCHAR(50) NOT NULL DEFAULT 'HISTORICAL_CSV',
+    status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
+    total_rows INT NOT NULL DEFAULT 0,
+    successful_rows INT NOT NULL DEFAULT 0,
+    inserted_rows INT NOT NULL DEFAULT 0,
+    updated_rows INT NOT NULL DEFAULT 0,
+    skipped_rows INT NOT NULL DEFAULT 0,
+    quarantined_rows INT NOT NULL DEFAULT 0,
+    failed_rows INT NOT NULL DEFAULT 0,
+    started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP NULL,
+    error_summary TEXT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_import_batches_competition FOREIGN KEY (competition_id) REFERENCES competitions (id) ON DELETE SET NULL,
+    CONSTRAINT fk_import_batches_season FOREIGN KEY (season_id) REFERENCES seasons (id) ON DELETE SET NULL,
+    CONSTRAINT fk_import_batches_comp_season FOREIGN KEY (competition_season_id) REFERENCES competition_seasons (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE import_quarantine_records (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    import_batch_id BIGINT NOT NULL,
+    source_file_name VARCHAR(255) NOT NULL,
+    source_row_number INT NOT NULL,
+    raw_row_data TEXT NOT NULL,
+    failure_category VARCHAR(50) NOT NULL,
+    failure_reason TEXT NOT NULL,
+    resolution_status VARCHAR(30) NOT NULL DEFAULT 'UNRESOLVED',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP NULL,
+    CONSTRAINT fk_quarantine_import_batch FOREIGN KEY (import_batch_id) REFERENCES import_batches (id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
